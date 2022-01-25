@@ -22,67 +22,73 @@ TokenCommunication::TokenCommunication(int id, int numberOfProcesses, bool hasTo
 
 void TokenCommunication::waitForToken() {
     while (!hasToken) {
-        auto message = receiveMessage();
+        auto message = receiveToken();
         switch (message->type) {
             case TOKEN:
                 processToken(message);
                 break;
-            case REC_TOKEN:
-                processRecoveryToken(message);
-                break;
             case ACK:
-                waitForToken();
                 break;
         }
         delete message;
     }
+    Logger::info(id, "Critical section (" + std::to_string(lastTokenId) + ")");
 }
 
 void TokenCommunication::sendToken() {
     hasToken = false;
     auto message = new Message(nextId(lastTokenId), TOKEN, nextProcess());
-    sendMessage(*message, nextProcess(), NON_ACK_MSG);
-    auto ackMessage = receiveMessageTimeout(nextProcess());
-    while (ackMessage != nullptr && ackMessage->id != message->id) {
-        delete ackMessage;
-        ackMessage = receiveMessageTimeout(nextProcess());
-    }
-    while (ackMessage == nullptr) {
-        message->type = REC_TOKEN;
-        message->targetProcess = nextProcess();
-        sendMessage(*message, previousProcess(), NON_ACK_MSG);
-        delete ackMessage;
-        ackMessage = receiveMessageTimeout(previousProcess());
+    sendMessage(*message, nextProcess(), TOKEN);
+    auto ackMessage = receiveAck(nextProcess());
+    while (ackMessage == nullptr || (ackMessage->id != message->id)) {
+        if (ackMessage != nullptr && ackMessage->type == TOKEN) {
+            processToken(ackMessage);
+            if (ackMessage->id > message->id) {
+                break;
+            }
+        }
+        sendMessage(*message, nextProcess(), TOKEN);
+//        delete ackMessage;
+        ackMessage = receiveAck(nextProcess());
+//        std::this_thread::sleep_for(std::chrono::milliseconds(TIME_OUT));
     }
     delete ackMessage;
     delete message;
 }
 
 void TokenCommunication::sendMessage(Message message, int processId, int tag) {
-    Logger::debug(id, "Sending: ", message);
+    Logger::debug(id, "Sending(" + std::to_string(lastTokenId) + "): ", message);
     MPI_Send(&message, 1, datatype, processId, tag, MPI_COMM_WORLD);
 }
 
-Message* TokenCommunication::receiveMessage() {
+Message* TokenCommunication::receiveToken() {
     MPI_Status status;
     auto message = new Message();
-    MPI_Recv(message, 1, datatype, MPI_ANY_SOURCE, NON_ACK_MSG, MPI_COMM_WORLD, &status);
-    Logger::debug(id, "Received: ", *message);
+    MPI_Recv(message, 1, datatype, MPI_ANY_SOURCE, TOKEN, MPI_COMM_WORLD, &status);
+    Logger::debug(id, "Received(" + std::to_string(lastTokenId) + "): ", *message);
     return message;
 }
 
-Message* TokenCommunication::receiveMessageTimeout(int processId) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(TIME_OUT));
+Message* TokenCommunication::receiveAck(int processId) {
+    Logger::info(id, "I'm in here");
     Message* message = nullptr;
     int flag;
-    MPI_Iprobe(processId, ACK_MSG, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
-    MPI_Iprobe(processId, ACK_MSG, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
-    if (flag) {
-        message = new Message();
-        MPI_Recv(message, 1, datatype, processId, ACK_MSG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        Logger::debug(id, "Received (timeout): ", *message);
-    } else {
-        Logger::debug(id, "Received (timeout): NOTHING");
+    std::chrono::time_point time = std::chrono::system_clock::now();
+    while ((std::chrono::system_clock::now() - time).count() < TIME_OUT * 1000 * 1000) {
+        MPI_Iprobe(processId, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, MPI_STATUS_IGNORE);
+        if (flag) {
+            message = new Message();
+            MPI_Recv(message, 1, datatype, processId, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+            Logger::debug(id, "Received ACK: ", *message);
+            if (message->type == TOKEN) {
+                Logger::info(id, "------------------------------------------------------------");
+            }
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    if (message != nullptr) {
+        Logger::debug(id, "Received ACK: NOTHING");
     }
     return message;
 }
@@ -97,37 +103,7 @@ void TokenCommunication::processToken(Message* message) {
         lastTokenId = message->id;
     }
     message = new Message(message->id, ACK, previousProcess());
-    sendMessage(*message, previousProcess(), ACK_MSG);
-}
-
-void TokenCommunication::processRecoveryToken(Message* message) {
-    if (!shouldAcceptToken()) {
-        Logger::info(id, "Omitting rec_token");
-        return;
-    }
-    Message* ackMessage;
-    if (message->targetProcess != id) {
-        ackMessage = new Message(message->id, ACK, nextProcess());
-        sendMessage(*ackMessage, nextProcess(), ACK_MSG);
-        if (message->id <= lastTokenId) { // TODO: Optymalizacja
-//            Logger::info(id, "This bitch is old");
-            return;
-        }
-        do {
-            sendMessage(*message, previousProcess(), NON_ACK_MSG);
-            ackMessage = receiveMessageTimeout(previousProcess());
-        } while (ackMessage == nullptr || ackMessage->id != message->id);
-        return;
-    }
-    if (message->id > lastTokenId) {
-        hasToken = true;
-        lastTokenId = message->id;
-    } else {
-//        Logger::info(id, "This bitch is old v2");
-    }
-    message->type = ACK;
-    message->targetProcess = nextProcess();
-    sendMessage(*message, nextProcess(), ACK_MSG);
+    sendMessage(*message, previousProcess(), ACK);
 }
 
 int TokenCommunication::nextProcess() const {
@@ -145,11 +121,11 @@ int TokenCommunication::nextId(int messageId) const {
 
 bool TokenCommunication::shouldAcceptToken() {
     std::mt19937 mt(rd());
-    std::uniform_int_distribution<int> dist(1, 5);
+    std::uniform_int_distribution<int> dist(1, 10);
     if (dist(mt) == 1) {
         return false;
     }
-    std::uniform_int_distribution<int> distTime(1, 200);
+    std::uniform_int_distribution<int> distTime(1, 110);
     int time = distTime(rd);
     std::this_thread::sleep_for(std::chrono::milliseconds(time));
     return true;

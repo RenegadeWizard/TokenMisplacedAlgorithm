@@ -14,8 +14,6 @@
 
 #define MESSAGE_SIZE 3
 #define TIME_OUT 100
-#define ACK_MSG 1
-#define NON_ACK_MSG 2
 
 class TokenCommunication {
 private:
@@ -30,8 +28,8 @@ private:
     [[nodiscard]] int nextProcess() const;
     [[nodiscard]] int previousProcess() const;
     [[nodiscard]] int nextId(int messageId) const;
-    Message* receiveMessage();
-    Message* receiveMessageTimeout(int processId);
+    Message* receiveToken();
+    Message* receiveAck(int processId);
     void processToken(Message* message);
     void processRecoveryToken(Message* message);
     bool shouldAcceptToken();

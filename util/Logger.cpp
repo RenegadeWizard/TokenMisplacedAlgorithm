@@ -17,9 +17,6 @@ void Logger::info(int id, const std::string& mainMessage, Message message) {
         case TOKEN:
             type = "TOKEN";
             break;
-        case REC_TOKEN:
-            type = "REC_TOKEN";
-            break;
         case ACK:
             type = "ACK";
             break;
@@ -38,9 +35,6 @@ void Logger::debug(int id, const std::string& mainMessage, Message message) {
     switch (message.type) {
         case TOKEN:
             type = "TOKEN";
-            break;
-        case REC_TOKEN:
-            type = "REC_TOKEN";
             break;
         case ACK:
             type = "ACK";
