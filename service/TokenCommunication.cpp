@@ -38,27 +38,30 @@ void TokenCommunication::waitForToken() {
 void TokenCommunication::sendToken() {
     hasToken = false;
     auto message = new Message(nextId(lastTokenId), TOKEN, nextProcess());
-    sendMessage(*message, nextProcess(), TOKEN);
-    auto ackMessage = receiveAck(nextProcess());
-    while (ackMessage == nullptr || (ackMessage->id != message->id)) {
+    sendMessage(*message, nextProcess());
+    auto ackMessage = receiveAck(MPI_ANY_SOURCE);
+    while (true) {
         if (ackMessage != nullptr && ackMessage->type == TOKEN) {
             processToken(ackMessage);
             if (ackMessage->id > message->id) {
                 break;
             }
+            ackMessage = receiveAck(MPI_ANY_SOURCE);
+            continue;
+        } else if (ackMessage != nullptr && ackMessage->id >= message->id) {
+            break;
         }
-        sendMessage(*message, nextProcess(), TOKEN);
+        sendMessage(*message, nextProcess());
 //        delete ackMessage;
-        ackMessage = receiveAck(nextProcess());
-//        std::this_thread::sleep_for(std::chrono::milliseconds(TIME_OUT));
+        ackMessage = receiveAck(MPI_ANY_SOURCE);
     }
     delete ackMessage;
     delete message;
 }
 
-void TokenCommunication::sendMessage(Message message, int processId, int tag) {
+void TokenCommunication::sendMessage(Message message, int processId) {
     Logger::debug(id, "Sending(" + std::to_string(lastTokenId) + "): ", message);
-    MPI_Send(&message, 1, datatype, processId, tag, MPI_COMM_WORLD);
+    MPI_Send(&message, 1, datatype, processId, message.type, MPI_COMM_WORLD);
 }
 
 Message* TokenCommunication::receiveToken() {
@@ -70,7 +73,6 @@ Message* TokenCommunication::receiveToken() {
 }
 
 Message* TokenCommunication::receiveAck(int processId) {
-    Logger::info(id, "I'm in here");
     Message* message = nullptr;
     int flag;
     std::chrono::time_point time = std::chrono::system_clock::now();
@@ -80,9 +82,6 @@ Message* TokenCommunication::receiveAck(int processId) {
             message = new Message();
             MPI_Recv(message, 1, datatype, processId, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
             Logger::debug(id, "Received ACK: ", *message);
-            if (message->type == TOKEN) {
-                Logger::info(id, "------------------------------------------------------------");
-            }
             break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -95,15 +94,15 @@ Message* TokenCommunication::receiveAck(int processId) {
 
 void TokenCommunication::processToken(Message* message) {
     if (!shouldAcceptToken()) {
-        Logger::info(id, "Omitting token");
-        return;
+        Logger::debug(id, "Omitting token");
     }
-    if (message->id > lastTokenId) {
+    if (compareIds(message->id)) {
+        Logger::debug(id, "is being tokened");
         hasToken = true;
         lastTokenId = message->id;
     }
     message = new Message(message->id, ACK, previousProcess());
-    sendMessage(*message, previousProcess(), ACK);
+    sendMessage(*message, previousProcess());
 }
 
 int TokenCommunication::nextProcess() const {
@@ -116,16 +115,23 @@ int TokenCommunication::previousProcess() const {
 
 int TokenCommunication::nextId(int messageId) const {
     return messageId + 1;
-//    return (messageId + 1) % (numberOfProcesses + 1);
+//    return (messageId + 1) % (2 * numberOfProcesses + 1);
+}
+
+bool TokenCommunication::compareIds(int messageId) {
+//    if (lastTokenId == numberOfProcesses * 2 && messageId == 0) {
+//        return true;
+//    }
+    return messageId > lastTokenId;
 }
 
 bool TokenCommunication::shouldAcceptToken() {
     std::mt19937 mt(rd());
-    std::uniform_int_distribution<int> dist(1, 10);
+    std::uniform_int_distribution<int> dist(1, 20);
     if (dist(mt) == 1) {
         return false;
     }
-    std::uniform_int_distribution<int> distTime(1, 110);
+    std::uniform_int_distribution<int> distTime(1, 55);
     int time = distTime(rd);
     std::this_thread::sleep_for(std::chrono::milliseconds(time));
     return true;

@@ -13,7 +13,7 @@
 #include "../util/Logger.h"
 
 #define MESSAGE_SIZE 3
-#define TIME_OUT 100
+#define TIME_OUT 50
 
 class TokenCommunication {
 private:
@@ -24,7 +24,7 @@ private:
     int lastTokenId = 0;
     std::random_device rd;
 
-    void sendMessage(Message message, int processId, int tag);
+    void sendMessage(Message message, int processId);
     [[nodiscard]] int nextProcess() const;
     [[nodiscard]] int previousProcess() const;
     [[nodiscard]] int nextId(int messageId) const;
@@ -34,6 +34,7 @@ private:
     void processRecoveryToken(Message* message);
     bool shouldAcceptToken();
     void handleNonAckMessage(Message* message);
+    bool compareIds(int id);
 public:
     TokenCommunication(int id, int numberOfProcesses, bool hasToken);
     TokenCommunication(int id, int numberOfProcesses) : TokenCommunication(id, numberOfProcesses, false) {}

@@ -6,6 +6,7 @@
 #include "Logger.h"
 
 std::mutex Logger::mutex;
+std::string Logger::level = "INFO";
 
 void Logger::info(int id, const std::string& string) {
     log(id, "INFO", string);
@@ -27,7 +28,9 @@ void Logger::info(int id, const std::string& mainMessage, Message message) {
 }
 
 void Logger::debug(int id, const std::string& string) {
-    log(id, "DEBUG", string);
+    if (level == "DEBUG") {
+        log(id, "DEBUG", string);
+    }
 }
 
 void Logger::debug(int id, const std::string& mainMessage, Message message) {

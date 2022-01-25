@@ -11,13 +11,18 @@
 #include <string>
 #include <mutex>
 #include <ctime>
+#include <utility>
 #include "../model/Message.h"
 
 class Logger {
 private:
     static std::mutex mutex;
     static void log(int id, const std::string&, const std::string&);
+    static std::string level;
 public:
+    static void setLevel(std::string level) {
+        Logger::level = std::move(level);
+    }
     static void info(int id, const std::string&);
     static void info(int id, const std::string&, Message);
     static void debug(int id, const std::string&);

@@ -23,6 +23,8 @@ int main(int argc, char **argv) {
         process = new TokenCommunication(id, size);
     }
 
+//    Logger::setLevel("DEBUG");
+
     while (true) {
         process->waitForToken();
 //        Logger::info(id, "Critical section");
