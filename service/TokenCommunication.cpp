@@ -54,6 +54,7 @@ void TokenCommunication::sendToken() {
         sendMessage(*message, nextProcess());
 //        delete ackMessage;
         ackMessage = receiveAck(MPI_ANY_SOURCE);
+        Logger::debug(id, "Sending token AGAIN (" + std::to_string(message->id) + ")");
     }
     delete ackMessage;
     delete message;
@@ -114,14 +115,15 @@ int TokenCommunication::previousProcess() const {
 }
 
 int TokenCommunication::nextId(int messageId) const {
-    return messageId + 1;
+//    return messageId + 1;
 //    return (messageId + 1) % (2 * numberOfProcesses + 1);
+    return (messageId + 1) % (3 * numberOfProcesses);
 }
 
 bool TokenCommunication::compareIds(int messageId) {
-//    if (lastTokenId == numberOfProcesses * 2 && messageId == 0) {
-//        return true;
-//    }
+    if (lastTokenId >= (2 * numberOfProcesses) && messageId < numberOfProcesses) {
+        return true;
+    }
     return messageId > lastTokenId;
 }
 
@@ -131,7 +133,7 @@ bool TokenCommunication::shouldAcceptToken() {
     if (dist(mt) == 1) {
         return false;
     }
-    std::uniform_int_distribution<int> distTime(1, 55);
+    std::uniform_int_distribution<int> distTime(1, TIME_OUT + 10);
     int time = distTime(rd);
     std::this_thread::sleep_for(std::chrono::milliseconds(time));
     return true;

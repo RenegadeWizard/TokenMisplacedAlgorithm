@@ -13,7 +13,7 @@
 #include "../util/Logger.h"
 
 #define MESSAGE_SIZE 3
-#define TIME_OUT 50
+#define TIME_OUT 100
 
 class TokenCommunication {
 private:
