@@ -116,7 +116,6 @@ int TokenCommunication::previousProcess() const {
 
 int TokenCommunication::nextId(int messageId) const {
 //    return messageId + 1;
-//    return (messageId + 1) % (2 * numberOfProcesses + 1);
     return (messageId + 1) % (3 * numberOfProcesses);
 }
 

@@ -31,9 +31,7 @@ private:
     Message* receiveToken();
     Message* receiveAck(int processId);
     void processToken(Message* message);
-    void processRecoveryToken(Message* message);
     bool shouldAcceptToken();
-    void handleNonAckMessage(Message* message);
     bool compareIds(int id);
 public:
     TokenCommunication(int id, int numberOfProcesses, bool hasToken);
