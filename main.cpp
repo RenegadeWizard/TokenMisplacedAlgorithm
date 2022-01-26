@@ -23,9 +23,11 @@ int main(int argc, char **argv) {
         process = new TokenCommunication(id, size);
     }
 
+//    Logger::setLevel("DEBUG");
+
     while (true) {
         process->waitForToken();
-        Logger::info(id, "Critical section");
+//        Logger::info(id, "Critical section");
 //        std::this_thread::sleep_for(std::chrono::milliseconds(100));
         process->sendToken();
     }

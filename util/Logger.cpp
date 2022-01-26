@@ -6,6 +6,7 @@
 #include "Logger.h"
 
 std::mutex Logger::mutex;
+std::string Logger::level = "INFO";
 
 void Logger::info(int id, const std::string& string) {
     log(id, "INFO", string);
@@ -17,9 +18,6 @@ void Logger::info(int id, const std::string& mainMessage, Message message) {
         case TOKEN:
             type = "TOKEN";
             break;
-        case REC_TOKEN:
-            type = "REC_TOKEN";
-            break;
         case ACK:
             type = "ACK";
             break;
@@ -30,7 +28,9 @@ void Logger::info(int id, const std::string& mainMessage, Message message) {
 }
 
 void Logger::debug(int id, const std::string& string) {
-    log(id, "DEBUG", string);
+    if (level == "DEBUG") {
+        log(id, "DEBUG", string);
+    }
 }
 
 void Logger::debug(int id, const std::string& mainMessage, Message message) {
@@ -38,9 +38,6 @@ void Logger::debug(int id, const std::string& mainMessage, Message message) {
     switch (message.type) {
         case TOKEN:
             type = "TOKEN";
-            break;
-        case REC_TOKEN:
-            type = "REC_TOKEN";
             break;
         case ACK:
             type = "ACK";
